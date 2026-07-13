@@ -10,13 +10,14 @@ import {
 } from '@angular/core';
 import { DuckDbService } from '../../services/duckdb/duck-db';
 import {
+  ApexDataLabels,
   ApexAxisChartSeries,
   ApexChart,
   ApexPlotOptions,
   ApexTitleSubtitle,
   ChartComponent,
 } from 'ng-apexcharts';
-import { format } from 'date-fns';
+import { format, getWeekOfMonth } from 'date-fns';
 
 interface Pm25Point {
   date: Date;
@@ -38,7 +39,16 @@ export class AqiHeatmap {
   public series = signal<ApexAxisChartSeries>([]);
   public chart = signal<ApexChart | undefined>(undefined);
   public plotOptions = signal<ApexPlotOptions | undefined>(undefined);
+  public dataLabels = signal<ApexDataLabels | undefined>(undefined);
   public title!: ApexTitleSubtitle;
+  public readonly subtitle: ApexTitleSubtitle = {
+    text: '* denotes likely street food market that occurs on the 4th Sunday of each month',
+    align: 'left',
+    style: {
+      fontSize: '12px',
+      color: '#64748b', // A clean, muted slate gray
+    },
+  };
 
   readonly daysOfWeek = [
     'Sunday',
@@ -54,8 +64,15 @@ export class AqiHeatmap {
     const chartData = this.chart();
     const plotOptionsData = this.plotOptions();
     const seriesData = this.series();
+    const dataLabelsData = this.dataLabels();
 
-    if (!chartData || !plotOptionsData || !seriesData || seriesData.length === 0) {
+    if (
+      !chartData ||
+      !plotOptionsData ||
+      !seriesData ||
+      seriesData.length === 0 ||
+      !dataLabelsData
+    ) {
       return null;
     }
 
@@ -63,6 +80,7 @@ export class AqiHeatmap {
       chart: chartData,
       plotOptions: plotOptionsData,
       series: seriesData,
+      dataLabels: dataLabelsData,
     };
   });
 
@@ -86,7 +104,11 @@ export class AqiHeatmap {
   }
 
   private prepareHeatmapData(data: Pm25Point[]) {
-    const matrix: { [day: string]: { [week: string]: { value: number; date: Date } } } = {};
+    const matrix: {
+      [day: string]: {
+        [week: string]: { value: number; date: Date; isStreetFoodMarketSunday: boolean };
+      };
+    } = {};
     const allWeeks = new Set<string>();
 
     this.daysOfWeek.forEach((day) => (matrix[day] = {}));
@@ -97,9 +119,12 @@ export class AqiHeatmap {
       const weekIdentifier = this.getWeekIdentifier(dateObj);
       allWeeks.add(weekIdentifier);
 
+      const isStreetFoodMarketSunday = dateObj ? this.isStreetFoodMarketSunday(dateObj) : false;
+
       matrix[dayName][weekIdentifier] = {
         value: Math.round(point.maxPm25),
         date: dateObj,
+        isStreetFoodMarketSunday,
       };
     });
 
@@ -112,7 +137,10 @@ export class AqiHeatmap {
           data: sortedWeeks.map((week) => ({
             x: week,
             y: matrix[day][week]?.value !== undefined ? matrix[day][week].value : 0,
-            meta: { date: matrix[day][week]?.date || null },
+            meta: {
+              date: matrix[day][week]?.date || null,
+              isStreetFoodMarketSunday: matrix[day][week]?.isStreetFoodMarketSunday,
+            },
           })),
         };
       }),
@@ -133,7 +161,6 @@ export class AqiHeatmap {
       height: 350,
       type: 'heatmap',
       zoom: { enabled: false },
-      toolbar: { show: false },
       events: {
         dataPointSelection: (event, chartContext, config) => {
           const seriesIndex = config.seriesIndex;
@@ -163,8 +190,46 @@ export class AqiHeatmap {
       },
     });
 
+    this.dataLabels.set({
+      enabled: true,
+      formatter: (val: any, opts: any) => {
+        const pm25Value = opts.w.config.series[opts.seriesIndex]?.data[opts.dataPointIndex]?.y;
+
+        const isStreetFoodMarketSunday =
+          opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex].meta
+            ?.isStreetFoodMarketSunday;
+
+        if (pm25Value === 0 || pm25Value === undefined) return '';
+
+        return isStreetFoodMarketSunday ? `${pm25Value}*` : `${pm25Value}`;
+      },
+      style: {
+        fontSize: '14px',
+        colors: ['#fff'], // Keeps the emoji readable over the cell colors
+      },
+    });
+
     this.title = {
       text: `${year} Peak Daily PM2.5 Levels`,
     };
+  }
+
+  private isStreetFoodMarketSunday(date: Date): boolean {
+    // Exclude January and days that are not Sunday
+    if (date.getMonth() === 0) return false;
+    if (date.getDay() !== 0) return false;
+
+    const year = date.getFullYear();
+    const dayOfMonth = date.getDate();
+
+    const isFourthSundayOfMonth = dayOfMonth >= 22 && dayOfMonth <= 28;
+
+    if (isFourthSundayOfMonth && year >= 2023) {
+      // Street food market starts 2023-10-22
+      if (year === 2023 && date.getMonth() < 9) return false;
+      return true;
+    }
+
+    return false;
   }
 }
