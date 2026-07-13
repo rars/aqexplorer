@@ -32,11 +32,11 @@
 
   <app-aqi-heatmap
     (dateChange)="onDateChange($event)"
-    [year]="getFullYear(selectedDate())"
+    [activeDate]="selectedDate()"
   ></app-aqi-heatmap>
 
   <app-data-density
     (dateChange)="onDateChange($event)"
-    [year]="getFullYear(selectedDate())"
+    [activeDate]="selectedDate()"
   ></app-data-density>
 </div>

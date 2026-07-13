@@ -17,12 +17,25 @@ import {
   ApexXAxis,
   ChartComponent,
 } from 'ng-apexcharts';
-import { format } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { map } from 'rxjs';
 
 interface DataPoint {
   date: Date;
   count: number;
 }
+
+type ViewSize = 'small' | 'medium' | 'large' | 'xlarge';
 
 @Component({
   selector: 'app-data-density',
@@ -32,17 +45,20 @@ interface DataPoint {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DataDensity {
-  public dateChange = output<Date>();
-  public year = input<number>(2025);
-
+  private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly duckDb = inject(DuckDbService);
-  public series = signal<ApexAxisChartSeries>([]);
-  public chart = signal<ApexChart | undefined>(undefined);
-  public plotOptions = signal<ApexPlotOptions | undefined>(undefined);
+
+  public readonly activeDate = input.required<Date>();
+  public readonly dateChange = output<Date>();
+  public readonly year = computed(() => this.activeDate().getFullYear());
+
+  public readonly series = signal<ApexAxisChartSeries>([]);
+  public readonly chart = signal<ApexChart | undefined>(undefined);
+  public readonly plotOptions = signal<ApexPlotOptions | undefined>(undefined);
   public xaxis!: ApexXAxis;
   public title!: ApexTitleSubtitle;
 
-  readonly daysOfWeek = [
+  private readonly daysOfWeek = [
     'Sunday',
     'Saturday',
     'Friday',
@@ -68,13 +84,31 @@ export class DataDensity {
     };
   });
 
+  protected viewSize = toSignal(
+    this.breakpointObserver
+      .observe([
+        '(max-width: 767px)',
+        '(min-width: 768px) and (max-width: 1199px)',
+        '(min-width: 1200px) and (max-width: 1725px)',
+      ])
+      .pipe(
+        map((result) => {
+          if (result.breakpoints['(max-width: 767px)']) return 'small';
+          if (result.breakpoints['(min-width: 768px) and (max-width: 1199px)']) return 'medium';
+          if (result.breakpoints['(min-width: 1200px) and (max-width: 1725px)']) return 'large';
+          return 'xlarge';
+        }),
+      ),
+    { initialValue: 'xlarge' },
+  );
+
   public constructor() {
     effect(() => {
-      this.loadData(this.year());
+      this.loadData(this.year(), this.activeDate(), this.viewSize());
     });
   }
 
-  private async loadData(year: number): Promise<void> {
+  private async loadData(year: number, activeDate: Date, viewSize: ViewSize): Promise<void> {
     const rawData = await this.duckDb.queryParquet(`
       SELECT CAST(timestamp AS DATE) AS date, COUNT(*) AS count
       FROM DATA_FILE
@@ -83,15 +117,43 @@ export class DataDensity {
       GROUP BY CAST(timestamp AS DATE)
     `);
 
-    this.prepareHeatmapData(rawData);
+    this.prepareHeatmapData(rawData, activeDate, viewSize);
     this.initChartOptions(year);
   }
 
-  private prepareHeatmapData(data: DataPoint[]) {
+  private prepareHeatmapData(data: DataPoint[], activeDate: Date, viewSize: ViewSize) {
     const matrix: { [day: string]: { [week: string]: { count: number; date: Date } } } = {};
     const allWeeks = new Set<string>();
 
     this.daysOfWeek.forEach((day) => (matrix[day] = {}));
+
+    switch (viewSize) {
+      case 'small': {
+        const monthStart = startOfWeek(addDays(startOfMonth(activeDate), -15), { weekStartsOn: 1 });
+        const endMonth = endOfWeek(addDays(endOfMonth(activeDate), 15), { weekStartsOn: 1 });
+
+        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
+        break;
+      }
+      case 'medium': {
+        const monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -2), {
+          weekStartsOn: 1,
+        });
+        const endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 2), { weekStartsOn: 1 });
+
+        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
+        break;
+      }
+      case 'large': {
+        const monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -3), {
+          weekStartsOn: 1,
+        });
+        const endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 3), { weekStartsOn: 1 });
+
+        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
+        break;
+      }
+    }
 
     data.forEach((point) => {
       const dateObj = new Date(point.date);

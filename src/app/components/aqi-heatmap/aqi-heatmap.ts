@@ -9,6 +9,8 @@ import {
   signal,
 } from '@angular/core';
 import { DuckDbService } from '../../services/duckdb/duck-db';
+import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
   ApexDataLabels,
   ApexAxisChartSeries,
@@ -17,12 +19,23 @@ import {
   ApexTitleSubtitle,
   ChartComponent,
 } from 'ng-apexcharts';
-import { format, getWeekOfMonth } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
+import { map } from 'rxjs';
 
 interface Pm25Point {
   date: Date;
   maxPm25: number;
 }
+
+type ViewSize = 'small' | 'medium' | 'large' | 'xlarge';
 
 @Component({
   selector: 'app-aqi-heatmap',
@@ -32,15 +45,18 @@ interface Pm25Point {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AqiHeatmap {
-  public dateChange = output<Date>();
-  public year = input<number>(2025);
-
+  private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly duckDb = inject(DuckDbService);
-  public series = signal<ApexAxisChartSeries>([]);
-  public chart = signal<ApexChart | undefined>(undefined);
-  public plotOptions = signal<ApexPlotOptions | undefined>(undefined);
-  public dataLabels = signal<ApexDataLabels | undefined>(undefined);
-  public title!: ApexTitleSubtitle;
+
+  public readonly activeDate = input.required<Date>();
+  public readonly year = computed(() => this.activeDate().getFullYear());
+  public readonly dateChange = output<Date>();
+
+  public readonly series = signal<ApexAxisChartSeries>([]);
+  public readonly chart = signal<ApexChart | undefined>(undefined);
+  public readonly plotOptions = signal<ApexPlotOptions | undefined>(undefined);
+  public readonly dataLabels = signal<ApexDataLabels | undefined>(undefined);
+  public readonly title = signal<ApexTitleSubtitle | undefined>(undefined);
   public readonly subtitle: ApexTitleSubtitle = {
     text: '* denotes likely street food market that occurs on the 4th Sunday of each month',
     align: 'left',
@@ -50,7 +66,7 @@ export class AqiHeatmap {
     },
   };
 
-  readonly daysOfWeek = [
+  private readonly daysOfWeek = [
     'Sunday',
     'Saturday',
     'Friday',
@@ -65,13 +81,15 @@ export class AqiHeatmap {
     const plotOptionsData = this.plotOptions();
     const seriesData = this.series();
     const dataLabelsData = this.dataLabels();
+    const titleData = this.title();
 
     if (
       !chartData ||
       !plotOptionsData ||
       !seriesData ||
       seriesData.length === 0 ||
-      !dataLabelsData
+      !dataLabelsData ||
+      !titleData
     ) {
       return null;
     }
@@ -81,16 +99,38 @@ export class AqiHeatmap {
       plotOptions: plotOptionsData,
       series: seriesData,
       dataLabels: dataLabelsData,
+      title: titleData,
     };
   });
 
+  protected viewSize = toSignal(
+    this.breakpointObserver
+      .observe([
+        '(max-width: 767px)',
+        '(min-width: 768px) and (max-width: 1199px)',
+        '(min-width: 1200px) and (max-width: 1725px)',
+      ])
+      .pipe(
+        map((result) => {
+          if (result.breakpoints['(max-width: 767px)']) return 'small';
+          if (result.breakpoints['(min-width: 768px) and (max-width: 1199px)']) return 'medium';
+          if (result.breakpoints['(min-width: 1200px) and (max-width: 1725px)']) return 'large';
+          return 'xlarge';
+        }),
+      ),
+    { initialValue: 'xlarge' },
+  );
+
   public constructor() {
     effect(() => {
-      this.loadData(this.year());
+      const viewSize = this.viewSize();
+      const activeDate = this.activeDate();
+
+      this.loadData(activeDate, this.year(), viewSize);
     });
   }
 
-  private async loadData(year: number): Promise<void> {
+  private async loadData(activeDate: Date, year: number, viewSize: ViewSize): Promise<void> {
     const rawData = await this.duckDb.queryParquet(`
       SELECT CAST(timestamp AS DATE) AS date, MAX(pm25) AS maxPm25
       FROM DATA_FILE
@@ -99,11 +139,11 @@ export class AqiHeatmap {
       GROUP BY CAST(timestamp AS DATE)
     `);
 
-    this.prepareHeatmapData(rawData);
+    this.prepareHeatmapData(rawData, activeDate, viewSize);
     this.initChartOptions(year);
   }
 
-  private prepareHeatmapData(data: Pm25Point[]) {
+  private prepareHeatmapData(data: Pm25Point[], activeDate: Date, viewSize: ViewSize) {
     const matrix: {
       [day: string]: {
         [week: string]: { value: number; date: Date; isStreetFoodMarketSunday: boolean };
@@ -112,6 +152,34 @@ export class AqiHeatmap {
     const allWeeks = new Set<string>();
 
     this.daysOfWeek.forEach((day) => (matrix[day] = {}));
+
+    switch (viewSize) {
+      case 'small': {
+        const monthStart = startOfWeek(addDays(startOfMonth(activeDate), -15), { weekStartsOn: 1 });
+        const endMonth = endOfWeek(addDays(endOfMonth(activeDate), 15), { weekStartsOn: 1 });
+
+        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
+        break;
+      }
+      case 'medium': {
+        const monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -2), {
+          weekStartsOn: 1,
+        });
+        const endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 2), { weekStartsOn: 1 });
+
+        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
+        break;
+      }
+      case 'large': {
+        const monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -3), {
+          weekStartsOn: 1,
+        });
+        const endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 3), { weekStartsOn: 1 });
+
+        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
+        break;
+      }
+    }
 
     data.forEach((point) => {
       const dateObj = new Date(point.date);
@@ -209,9 +277,9 @@ export class AqiHeatmap {
       },
     });
 
-    this.title = {
+    this.title.set({
       text: `${year} Peak Daily PM2.5 Levels`,
-    };
+    });
   }
 
   private isStreetFoodMarketSunday(date: Date): boolean {
