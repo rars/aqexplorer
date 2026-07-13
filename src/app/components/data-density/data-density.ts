@@ -49,8 +49,11 @@ export class DataDensity {
   private readonly duckDb = inject(DuckDbService);
 
   public readonly activeDate = input.required<Date>();
+  private readonly dedupedActiveDate = computed(() => this.activeDate(), {
+    equal: (a, b) => a?.getTime() === b?.getTime(),
+  });
   public readonly dateChange = output<Date>();
-  public readonly year = computed(() => this.activeDate().getFullYear());
+  public readonly year = computed(() => this.dedupedActiveDate().getFullYear());
 
   public readonly series = signal<ApexAxisChartSeries>([]);
   public readonly chart = signal<ApexChart | undefined>(undefined);
@@ -67,6 +70,14 @@ export class DataDensity {
     'Tuesday',
     'Monday',
   ];
+
+  protected readonly isChartReady = computed(() => {
+    const chartData = this.chart();
+    const plotOptionsData = this.plotOptions();
+    const seriesData = this.series();
+
+    return chartData && plotOptionsData && seriesData && seriesData.length !== 0;
+  });
 
   protected readonly chartConfiguration = computed(() => {
     const chartData = this.chart();
@@ -104,7 +115,11 @@ export class DataDensity {
 
   public constructor() {
     effect(() => {
-      this.loadData(this.year(), this.activeDate(), this.viewSize());
+      this.loadData(this.year(), this.dedupedActiveDate(), this.viewSize());
+    });
+
+    effect(() => {
+      this.initChartOptions(this.year());
     });
   }
 
@@ -118,7 +133,6 @@ export class DataDensity {
     `);
 
     this.prepareHeatmapData(rawData, activeDate, viewSize);
-    this.initChartOptions(year);
   }
 
   private prepareHeatmapData(data: DataPoint[], activeDate: Date, viewSize: ViewSize) {

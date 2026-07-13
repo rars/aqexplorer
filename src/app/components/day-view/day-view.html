@@ -23,20 +23,16 @@
   </table>-->
 
   <div style="background: white; padding: 20px; border-radius: 8px">
-    @if (chartOptions(); as options) {
-      <apx-chart
-        [series]="options.series!"
-        [chart]="options.chart!"
-        [xaxis]="options.xaxis!"
-        [yaxis]="options.yaxis!"
-        [title]="options.title!"
-      >
-      </apx-chart>
-      <p class="text-sm text-slate-500 font-normal mt-1 mb-4 max-w-2xl">
-        This chart shows the hourly readings of PM2.5 throughout the day.
-      </p>
-    } @else {
-      <p>Loading chart data from DuckDB...</p>
-    }
+    <apx-chart
+      [series]="series()"
+      [chart]="chart"
+      [xaxis]="xaxis"
+      [yaxis]="yaxis()"
+      [title]="title"
+    >
+    </apx-chart>
+    <p class="text-sm text-slate-500 font-normal mt-1 mb-4 max-w-2xl">
+      This chart shows the hourly readings of PM2.5 throughout the day.
+    </p>
   </div>
 </div>

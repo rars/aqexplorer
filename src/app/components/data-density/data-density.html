@@ -1,10 +1,10 @@
-@if (chartConfiguration(); as config) {
+@if (isChartReady()) {
   <div id="chart">
     <apx-chart
       class="[&_.apexcharts-heatmap-rect]:cursor-pointer"
-      [series]="config.series"
-      [chart]="config.chart"
-      [plotOptions]="config.plotOptions"
+      [series]="series()"
+      [chart]="chart()!"
+      [plotOptions]="plotOptions()!"
       [title]="title"
     >
     </apx-chart>

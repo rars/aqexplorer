@@ -9,7 +9,14 @@ import {
   signal,
 } from '@angular/core';
 import { DuckDbService } from '../../services/duckdb/duck-db';
-import { ApexOptions, ChartComponent } from 'ng-apexcharts';
+import {
+  ApexAxisChartSeries,
+  ApexChart,
+  ApexTitleSubtitle,
+  ApexXAxis,
+  ApexYAxis,
+  ChartComponent,
+} from 'ng-apexcharts';
 import { format } from 'date-fns';
 
 @Component({
@@ -28,35 +35,40 @@ export class DayView {
   protected readonly loading = signal<boolean>(true);
   protected readonly error = signal<any | undefined>(undefined);
 
-  protected readonly chartOptions = computed<ApexOptions>(() => {
+  protected readonly chart: ApexChart = {
+    type: 'line',
+    height: 350,
+    zoom: { enabled: false },
+  };
+  protected readonly xaxis: ApexXAxis = {
+    type: 'datetime',
+    title: { text: 'Time of Day' },
+  };
+  protected readonly title: ApexTitleSubtitle = {
+    text: 'PM2.5 (µg/m³)',
+  };
+
+  protected readonly series = computed<ApexAxisChartSeries>(() => {
     const rawRows = this.data();
 
     const chartDataPoints = rawRows.map((row) => [new Date(row.timestamp).getTime(), row.pm25]);
 
-    return {
-      series: [
-        {
-          name: 'PM2.5 Level',
-          data: chartDataPoints,
-        },
-      ],
-      chart: {
-        type: 'line',
-        height: 350,
-        zoom: { enabled: false },
+    return [
+      {
+        name: 'PM2.5 Level',
+        data: chartDataPoints,
       },
-      xaxis: {
-        type: 'datetime',
-        title: { text: 'Time of Day' },
-      },
-      yaxis: {
-        title: { text: 'PM2.5 (µg/m³)' },
-        forceNiceScale: true,
-      },
-      title: {
-        text: 'PM2.5 (µg/m³)',
-      },
+    ];
+  });
+
+  protected readonly yaxis = computed(() => {
+    const _ = this.series();
+
+    const axisConfig: ApexYAxis = {
+      title: { text: 'PM2.5 (µg/m³)' },
+      forceNiceScale: true,
     };
+    return axisConfig;
   });
 
   public constructor() {
@@ -89,7 +101,6 @@ export class DayView {
       this.error.set(err);
     } finally {
       this.loading.set(false);
-
       this.cdr.detectChanges();
     }
   }

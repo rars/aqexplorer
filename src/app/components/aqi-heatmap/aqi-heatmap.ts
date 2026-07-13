@@ -49,7 +49,10 @@ export class AqiHeatmap {
   private readonly duckDb = inject(DuckDbService);
 
   public readonly activeDate = input.required<Date>();
-  public readonly year = computed(() => this.activeDate().getFullYear());
+  private readonly dedupedActiveDate = computed(() => this.activeDate(), {
+    equal: (a, b) => a?.getTime() === b?.getTime(),
+  });
+  public readonly year = computed(() => this.dedupedActiveDate().getFullYear());
   public readonly dateChange = output<Date>();
 
   public readonly series = signal<ApexAxisChartSeries>([]);
@@ -76,31 +79,24 @@ export class AqiHeatmap {
     'Monday',
   ];
 
-  protected readonly chartConfiguration = computed(() => {
+  private lastViewSize: ViewSize | null = null;
+  private lastDateRangeKey: string = '';
+
+  protected readonly isChartReady = computed(() => {
     const chartData = this.chart();
     const plotOptionsData = this.plotOptions();
     const seriesData = this.series();
     const dataLabelsData = this.dataLabels();
     const titleData = this.title();
 
-    if (
-      !chartData ||
-      !plotOptionsData ||
-      !seriesData ||
-      seriesData.length === 0 ||
-      !dataLabelsData ||
-      !titleData
-    ) {
-      return null;
-    }
-
-    return {
-      chart: chartData,
-      plotOptions: plotOptionsData,
-      series: seriesData,
-      dataLabels: dataLabelsData,
-      title: titleData,
-    };
+    return (
+      chartData &&
+      plotOptionsData &&
+      seriesData &&
+      seriesData.length !== 0 &&
+      dataLabelsData &&
+      titleData
+    );
   });
 
   protected viewSize = toSignal(
@@ -124,9 +120,13 @@ export class AqiHeatmap {
   public constructor() {
     effect(() => {
       const viewSize = this.viewSize();
-      const activeDate = this.activeDate();
+      const activeDate = this.dedupedActiveDate();
 
       this.loadData(activeDate, this.year(), viewSize);
+    });
+
+    effect(() => {
+      this.initChartOptions(this.year());
     });
   }
 
@@ -140,7 +140,6 @@ export class AqiHeatmap {
     `);
 
     this.prepareHeatmapData(rawData, activeDate, viewSize);
-    this.initChartOptions(year);
   }
 
   private prepareHeatmapData(data: Pm25Point[], activeDate: Date, viewSize: ViewSize) {
@@ -153,32 +152,48 @@ export class AqiHeatmap {
 
     this.daysOfWeek.forEach((day) => (matrix[day] = {}));
 
+    let monthStart: Date | null = null;
+    let endMonth: Date | null = null;
+
     switch (viewSize) {
       case 'small': {
-        const monthStart = startOfWeek(addDays(startOfMonth(activeDate), -15), { weekStartsOn: 1 });
-        const endMonth = endOfWeek(addDays(endOfMonth(activeDate), 15), { weekStartsOn: 1 });
+        monthStart = startOfWeek(addDays(startOfMonth(activeDate), -15), { weekStartsOn: 1 });
+        endMonth = endOfWeek(addDays(endOfMonth(activeDate), 15), { weekStartsOn: 1 });
 
-        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
         break;
       }
       case 'medium': {
-        const monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -2), {
+        monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -2), {
           weekStartsOn: 1,
         });
-        const endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 2), { weekStartsOn: 1 });
+        endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 2), { weekStartsOn: 1 });
 
-        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
         break;
       }
       case 'large': {
-        const monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -3), {
+        monthStart = startOfWeek(addMonths(startOfMonth(activeDate), -3), {
           weekStartsOn: 1,
         });
-        const endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 3), { weekStartsOn: 1 });
+        endMonth = endOfWeek(addMonths(endOfMonth(activeDate), 3), { weekStartsOn: 1 });
 
-        data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
         break;
       }
+    }
+
+    const dateRangeKey =
+      monthStart && endMonth
+        ? `${monthStart.getTime()}-${endMonth.getTime()}`
+        : `full-year-${activeDate.getFullYear()}`;
+
+    if (viewSize === this.lastViewSize && dateRangeKey === this.lastDateRangeKey) {
+      return;
+    }
+
+    this.lastViewSize = viewSize;
+    this.lastDateRangeKey = dateRangeKey;
+
+    if (monthStart && endMonth) {
+      data = data.filter((x) => x.date >= monthStart && x.date < endMonth);
     }
 
     data.forEach((point) => {
