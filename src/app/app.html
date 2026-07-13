@@ -1,7 +1,7 @@
-<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-  <h2>AirQuality Explorer</h2>
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+  <h2 class="text-3xl font-bold tracking-tight text-slate-900 mb-6 sm:mb-8">AirQuality Explorer</h2>
 
-  <div class="control-panel" style="margin-bottom: 20px">
+  <div class="mb-6">
     <mat-form-field appearance="outline">
       <mat-label>Choose a date</mat-label>
       <input
@@ -21,4 +21,8 @@
     (dateChange)="onDateChange($event)"
     [year]="getFullYear(selectedDate())"
   ></app-data-density>
+  <app-aqi-heatmap
+    (dateChange)="onDateChange($event)"
+    [year]="getFullYear(selectedDate())"
+  ></app-aqi-heatmap>
 </div>

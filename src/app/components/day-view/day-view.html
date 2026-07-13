@@ -1,11 +1,9 @@
 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-  <h2>Day View</h2>
-
   @if (error()) {
     <div style="color: red">Error: {{ error() }}</div>
   }
 
-  <table border="1" cellpadding="5" style="border-collapse: collapse">
+  <!--<table border="1" cellpadding="5" style="border-collapse: collapse">
     <thead>
       <tr>
         @for (key of objectKeys(data()[0]); track key) {
@@ -22,7 +20,7 @@
         </tr>
       }
     </tbody>
-  </table>
+  </table>-->
 
   <div style="background: white; padding: 20px; border-radius: 8px">
     @if (chartOptions(); as options) {

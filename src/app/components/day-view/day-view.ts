@@ -54,7 +54,7 @@ export class DayView {
         forceNiceScale: true,
       },
       title: {
-        text: 'Air Quality Data',
+        text: 'PM2.5 (µg/m³)',
       },
     };
   });

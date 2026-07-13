@@ -5,10 +5,18 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { getYear } from 'date-fns';
+import { AqiHeatmap } from './components/aqi-heatmap/aqi-heatmap';
 
 @Component({
   selector: 'app-root',
-  imports: [DayView, DataDensity, MatFormFieldModule, MatInputModule, MatDatepickerModule],
+  imports: [
+    DayView,
+    DataDensity,
+    MatFormFieldModule,
+    MatInputModule,
+    MatDatepickerModule,
+    AqiHeatmap,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

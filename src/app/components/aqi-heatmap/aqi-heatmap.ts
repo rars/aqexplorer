@@ -14,24 +14,23 @@ import {
   ApexChart,
   ApexPlotOptions,
   ApexTitleSubtitle,
-  ApexXAxis,
   ChartComponent,
 } from 'ng-apexcharts';
 import { format } from 'date-fns';
 
-interface DataPoint {
+interface Pm25Point {
   date: Date;
-  count: number;
+  maxPm25: number;
 }
 
 @Component({
-  selector: 'app-data-density',
+  selector: 'app-aqi-heatmap',
   imports: [ChartComponent],
-  templateUrl: './data-density.html',
-  styleUrl: './data-density.css',
+  templateUrl: './aqi-heatmap.html',
+  styleUrl: './aqi-heatmap.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DataDensity {
+export class AqiHeatmap {
   public dateChange = output<Date>();
   public year = input<number>(2025);
 
@@ -39,7 +38,6 @@ export class DataDensity {
   public series = signal<ApexAxisChartSeries>([]);
   public chart = signal<ApexChart | undefined>(undefined);
   public plotOptions = signal<ApexPlotOptions | undefined>(undefined);
-  public xaxis!: ApexXAxis;
   public title!: ApexTitleSubtitle;
 
   readonly daysOfWeek = [
@@ -76,7 +74,7 @@ export class DataDensity {
 
   private async loadData(year: number): Promise<void> {
     const rawData = await this.duckDb.queryParquet(`
-      SELECT CAST(timestamp AS DATE) AS date, COUNT(*) AS count
+      SELECT CAST(timestamp AS DATE) AS date, MAX(pm25) AS maxPm25
       FROM DATA_FILE
       WHERE CAST(timestamp AS DATE) >= '${year}-01-01' AND CAST(timestamp AS DATE) <= '${year}-12-31'
       AND pm25 IS NOT NULL
@@ -87,21 +85,22 @@ export class DataDensity {
     this.initChartOptions(year);
   }
 
-  private prepareHeatmapData(data: DataPoint[]) {
-    const matrix: { [day: string]: { [week: string]: { count: number; date: Date } } } = {};
+  private prepareHeatmapData(data: Pm25Point[]) {
+    const matrix: { [day: string]: { [week: string]: { value: number; date: Date } } } = {};
     const allWeeks = new Set<string>();
 
     this.daysOfWeek.forEach((day) => (matrix[day] = {}));
 
     data.forEach((point) => {
       const dateObj = new Date(point.date);
-
       const dayName = format(dateObj, 'EEEE');
-
       const weekIdentifier = this.getWeekIdentifier(dateObj);
       allWeeks.add(weekIdentifier);
 
-      matrix[dayName][weekIdentifier] = { count: point.count, date: dateObj };
+      matrix[dayName][weekIdentifier] = {
+        value: Math.round(point.maxPm25),
+        date: dateObj,
+      };
     });
 
     const sortedWeeks = Array.from(allWeeks).sort();
@@ -112,7 +111,7 @@ export class DataDensity {
           name: day,
           data: sortedWeeks.map((week) => ({
             x: week,
-            y: matrix[day][week]?.count !== undefined ? matrix[day][week].count : 0,
+            y: matrix[day][week]?.value !== undefined ? matrix[day][week].value : 0,
             meta: { date: matrix[day][week]?.date || null },
           })),
         };
@@ -133,17 +132,16 @@ export class DataDensity {
     this.chart.set({
       height: 350,
       type: 'heatmap',
+      zoom: { enabled: false },
+      toolbar: { show: false },
       events: {
         dataPointSelection: (event, chartContext, config) => {
-          console.log('Data Point Clicked:', config);
           const seriesIndex = config.seriesIndex;
           const dataPointIndex = config.dataPointIndex;
-
           const clickedDataPoint = config.w.config.series[seriesIndex].data[dataPointIndex];
-          console.log(clickedDataPoint);
+
           if (clickedDataPoint && clickedDataPoint.meta?.date) {
             this.dateChange.emit(clickedDataPoint.meta.date);
-            console.log('Selected Date:', clickedDataPoint.meta.date);
           }
         },
       },
@@ -156,16 +154,17 @@ export class DataDensity {
         useFillColorAsStroke: true,
         colorScale: {
           ranges: [
-            { from: 0, to: 9, name: 'Low Data', color: '#ecf0f1 ' },
-            { from: 10, to: 23, name: 'Medium', color: '#fe9929' },
-            { from: 24, to: 24, name: 'High', color: '#1f78b4' },
+            { from: 0, to: 12, name: 'Good (0-12)', color: '#2ecc71' },
+            { from: 12.1, to: 35.4, name: 'Moderate', color: '#f1c40f' },
+            { from: 35.5, to: 55.4, name: 'Unhealthy Context', color: '#e67e22' },
+            { from: 55.5, to: 9999, name: 'Severe Spike', color: '#e74c3c' },
           ],
         },
       },
     });
 
     this.title = {
-      text: `${year} Number of data points (expected 24 per day)`,
+      text: `${year} Peak Daily PM2.5 Levels`,
     };
   }
 }
