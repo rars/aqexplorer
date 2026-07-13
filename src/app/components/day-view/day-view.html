@@ -1,0 +1,57 @@
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  <h2>Day View</h2>
+
+  <div class="control-panel" style="margin-bottom: 20px">
+    <mat-form-field appearance="outline">
+      <mat-label>Choose a date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="picker"
+        [value]="selectedDate()"
+        (dateChange)="onDateChange($event.value)"
+      />
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  @if (loading()) {
+    <div>Reading data from Parquet file...</div>
+  } @else if (error()) {
+    <div style="color: red">Error: {{ error() }}</div>
+  } @else {
+    <table border="1" cellpadding="5" style="border-collapse: collapse">
+      <thead>
+        <tr>
+          @for (key of objectKeys(data()[0]); track key) {
+            <th>{{ key }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of data(); track row) {
+          <tr>
+            @for (value of objectValues(row); track $index) {
+              <td>{{ value }}</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <div style="background: white; padding: 20px; border-radius: 8px">
+      @if (chartOptions.series.length > 0) {
+        <apx-chart
+          [series]="chartOptions.series"
+          [chart]="chartOptions.chart"
+          [xaxis]="chartOptions.xaxis"
+          [yaxis]="chartOptions.yaxis"
+          [title]="chartOptions.title"
+        >
+        </apx-chart>
+      } @else {
+        <p>Loading chart data from DuckDB...</p>
+      }
+    </div>
+  }
+</div>
