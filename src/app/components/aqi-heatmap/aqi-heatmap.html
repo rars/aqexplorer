@@ -1,6 +1,7 @@
 @if (chartConfiguration(); as config) {
   <div id="chart">
     <apx-chart
+      class="[&_.apexcharts-heatmap-rect]:cursor-pointer"
       [series]="config.series"
       [chart]="config.chart"
       [plotOptions]="config.plotOptions"
@@ -9,5 +10,9 @@
       [subtitle]="subtitle"
     >
     </apx-chart>
+    <p class="text-sm text-slate-500 font-normal mt-1 mb-4 max-w-2xl">
+      This heatmap shows the worst PM2.5 readings on each day over the year. You can click on a
+      block to view the data for that day.
+    </p>
   </div>
 }

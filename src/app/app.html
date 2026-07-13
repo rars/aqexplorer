@@ -5,7 +5,12 @@
 
   <p class="mb-6">
     Data is taken from
-    <a href="https://www.airqualityengland.co.uk/site/latest?site_id=HS4">Air Quality England</a>
+    <a
+      href="https://www.airqualityengland.co.uk/site/latest?site_id=HS4"
+      target="_blank"
+      class="text-blue-600 hover:text-blue-800 font-medium underline decoration-sky-500/30 hover:decoration-blue-800 transition-colors"
+      >Air Quality England</a
+    >
     for Hounslow Chiswick (HS4).
   </p>
 
@@ -25,12 +30,13 @@
 
   <app-day-view [date]="selectedDate()"></app-day-view>
 
-  <app-data-density
-    (dateChange)="onDateChange($event)"
-    [year]="getFullYear(selectedDate())"
-  ></app-data-density>
   <app-aqi-heatmap
     (dateChange)="onDateChange($event)"
     [year]="getFullYear(selectedDate())"
   ></app-aqi-heatmap>
+
+  <app-data-density
+    (dateChange)="onDateChange($event)"
+    [year]="getFullYear(selectedDate())"
+  ></app-data-density>
 </div>
