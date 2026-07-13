@@ -1,2 +1,24 @@
-<h2>AQ Explorer</h2>
-<app-day-view></app-day-view>
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  <h2>AirQuality Explorer</h2>
+
+  <div class="control-panel" style="margin-bottom: 20px">
+    <mat-form-field appearance="outline">
+      <mat-label>Choose a date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="picker"
+        [value]="selectedDate()"
+        (dateChange)="onDateChange($event.value)"
+      />
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  <app-day-view [date]="selectedDate()"></app-day-view>
+
+  <app-data-density
+    (dateChange)="onDateChange($event)"
+    [year]="getFullYear(selectedDate())"
+  ></app-data-density>
+</div>

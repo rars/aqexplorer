@@ -2,67 +2,74 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  computed,
+  effect,
   inject,
-  OnInit,
+  input,
   signal,
 } from '@angular/core';
 import { DuckDbService } from '../../services/duckdb/duck-db';
-import { ChartComponent } from 'ng-apexcharts';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDatepickerModule } from '@angular/material/datepicker';
+import { ApexOptions, ChartComponent } from 'ng-apexcharts';
+import { format } from 'date-fns';
 
 @Component({
   selector: 'app-day-view',
-  imports: [ChartComponent, MatFormFieldModule, MatInputModule, MatDatepickerModule],
+  imports: [ChartComponent],
   templateUrl: './day-view.html',
   styleUrl: './day-view.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DayView implements OnInit {
+export class DayView {
   private readonly duckDb = inject(DuckDbService);
   private readonly cdr = inject(ChangeDetectorRef);
 
-  protected readonly selectedDate = signal<Date>(new Date('2025-09-28'));
+  public readonly date = input.required<Date>();
   protected readonly data = signal<any[]>([]);
   protected readonly loading = signal<boolean>(true);
   protected readonly error = signal<any | undefined>(undefined);
 
-  protected chartOptions: any = {
-    series: [],
-    chart: {
-      type: 'line',
-      height: 350,
-      zoom: { enabled: true },
-    },
-    xaxis: {
-      type: 'datetime',
-      title: { text: 'Time of Day' },
-    },
-    yaxis: {
-      title: { text: 'PM2.5 (µg/m³)' },
-    },
-    title: {
-      text: 'Air Quality Data',
-    },
-  };
+  protected readonly chartOptions = computed<ApexOptions>(() => {
+    const rawRows = this.data();
 
-  ngOnInit(): void {
-    this.loadParquetData();
+    const chartDataPoints = rawRows.map((row) => [new Date(row.timestamp).getTime(), row.pm25]);
+
+    return {
+      series: [
+        {
+          name: 'PM2.5 Level',
+          data: chartDataPoints,
+        },
+      ],
+      chart: {
+        type: 'line',
+        height: 350,
+        zoom: { enabled: false },
+      },
+      xaxis: {
+        type: 'datetime',
+        title: { text: 'Time of Day' },
+      },
+      yaxis: {
+        title: { text: 'PM2.5 (µg/m³)' },
+        forceNiceScale: true,
+      },
+      title: {
+        text: 'Air Quality Data',
+      },
+    };
+  });
+
+  public constructor() {
+    effect(() => {
+      const selectedDate = this.date();
+      this.loadParquetData(selectedDate);
+    });
   }
 
-  protected onDateChange(newDate: any): void {
-    if (newDate) {
-      const nativeDate = new Date(newDate);
-      this.selectedDate.set(nativeDate);
-      this.loadParquetData();
-    }
-  }
-
-  private async loadParquetData(): Promise<void> {
+  private async loadParquetData(date: Date): Promise<void> {
     this.loading.set(true);
     try {
-      const formattedDate = this.selectedDate().toISOString().split('T')[0];
+      const formattedDate = format(date, 'yyyy-MM-dd');
 
       const sql = `
         SELECT
@@ -77,7 +84,6 @@ export class DayView implements OnInit {
       `;
 
       this.data.set(await this.duckDb.queryParquet(sql));
-      this.setChartSeries();
     } catch (err) {
       console.error(err);
       this.error.set(err);
@@ -94,19 +100,5 @@ export class DayView implements OnInit {
 
   protected objectValues(object: any): any[] {
     return object ? Object.values(object) : [];
-  }
-
-  private setChartSeries() {
-    const chartDataPoints = this.data().map((row) => [
-      row.timestamp, // x-axis (milliseconds)
-      row.pm25, // y-axis (value)
-    ]);
-
-    this.chartOptions.series = [
-      {
-        name: 'PM2.5 Level',
-        data: chartDataPoints,
-      },
-    ];
   }
 }

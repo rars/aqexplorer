@@ -1,0 +1,12 @@
+<h2>{{ year() }} Data Density</h2>
+@if (chartConfiguration(); as config) {
+  <div id="chart">
+    <apx-chart
+      [series]="config.series"
+      [chart]="config.chart"
+      [plotOptions]="config.plotOptions"
+      [title]="title"
+    >
+    </apx-chart>
+  </div>
+}
