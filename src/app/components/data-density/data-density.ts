@@ -135,12 +135,10 @@ export class DataDensity {
       type: 'heatmap',
       events: {
         dataPointSelection: (event, chartContext, config) => {
-          console.log('Data Point Clicked:', config);
           const seriesIndex = config.seriesIndex;
           const dataPointIndex = config.dataPointIndex;
 
           const clickedDataPoint = config.w.config.series[seriesIndex].data[dataPointIndex];
-          console.log(clickedDataPoint);
           if (clickedDataPoint && clickedDataPoint.meta?.date) {
             this.dateChange.emit(clickedDataPoint.meta.date);
           }

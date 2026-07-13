@@ -30,7 +30,6 @@ export const appConfig: ApplicationConfig = {
       const duckDbService = inject(DuckDbService);
       const baseHref = inject(APP_BASE_HREF, { optional: true }) || '/';
       const cleanBaseHref = baseHref.endsWith('/') ? baseHref : `${baseHref}/`;
-      console.log(`Base href: ${cleanBaseHref}`);
       const fileUrl = window.location.origin + cleanBaseHref + 'pm2.5.parquet';
       return duckDbService.initDatabase(fileUrl);
     }),
