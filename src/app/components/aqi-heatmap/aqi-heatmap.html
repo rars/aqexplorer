@@ -1,5 +1,17 @@
 @if (isChartReady()) {
   <div id="chart">
+    <div class="flex items-center justify-end gap-3 mb-4">
+      <span class="text-sm font-medium text-slate-600">Metric:</span>
+      <mat-button-toggle-group
+        [value]="metric()"
+        (change)="metric.set($event.value)"
+        aria-label="Select PM2.5 Metric"
+      >
+        <mat-button-toggle value="avg">24-Hour Average</mat-button-toggle>
+        <mat-button-toggle value="max">Daily Peak (Max)</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
     <apx-chart
       class="[&_.apexcharts-heatmap-rect]:cursor-pointer"
       [series]="series()!"
@@ -11,8 +23,14 @@
     >
     </apx-chart>
     <p class="text-sm text-slate-500 font-normal mt-1 mb-4 max-w-2xl">
-      This heatmap shows the worst PM2.5 readings on each day over the year. You can click on a
-      block to view the data for that day.
+      @if (metric() === 'max') {
+        This heatmap shows the <strong>worst (maximum) hourly PM2.5 readings</strong> on each day
+        over the year. Perfect for finding spikes.
+      } @else {
+        This heatmap shows the <strong>average 24-hour PM2.5 exposure</strong> for each day,
+        filtering out incomplete days (under 18 hours of data).
+      }
+      You can click on a block to view the data for that day.
     </p>
   </div>
 }

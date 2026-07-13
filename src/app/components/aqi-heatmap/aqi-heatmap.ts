@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { DuckDbService } from '../../services/duckdb/duck-db';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -33,13 +34,15 @@ import { map } from 'rxjs';
 interface Pm25Point {
   date: Date;
   maxPm25: number;
+  avgPm25: number;
 }
 
 type ViewSize = 'small' | 'medium' | 'large' | 'xlarge';
+type Metric = 'avg' | 'max';
 
 @Component({
   selector: 'app-aqi-heatmap',
-  imports: [ChartComponent],
+  imports: [ChartComponent, MatButtonToggleModule],
   templateUrl: './aqi-heatmap.html',
   styleUrl: './aqi-heatmap.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -59,7 +62,14 @@ export class AqiHeatmap {
   public readonly chart = signal<ApexChart | undefined>(undefined);
   public readonly plotOptions = signal<ApexPlotOptions | undefined>(undefined);
   public readonly dataLabels = signal<ApexDataLabels | undefined>(undefined);
-  public readonly title = signal<ApexTitleSubtitle | undefined>(undefined);
+  public readonly title = computed(() => {
+    const year = this.year();
+    const metric = this.metric();
+    return {
+      text: `${year} ${metric === 'avg' ? '24-Hour Average' : 'Peak'} PM2.5 Levels`,
+    } as ApexTitleSubtitle;
+  });
+
   public readonly subtitle: ApexTitleSubtitle = {
     text: '* denotes likely street food market that occurs on the 4th Sunday of each month',
     align: 'left',
@@ -81,6 +91,8 @@ export class AqiHeatmap {
 
   private lastViewSize: ViewSize | null = null;
   private lastDateRangeKey: string = '';
+
+  protected readonly metric = signal<Metric>('avg');
 
   protected readonly isChartReady = computed(() => {
     const chartData = this.chart();
@@ -119,10 +131,7 @@ export class AqiHeatmap {
 
   public constructor() {
     effect(() => {
-      const viewSize = this.viewSize();
-      const activeDate = this.dedupedActiveDate();
-
-      this.loadData(activeDate, this.year(), viewSize);
+      this.loadData(this.dedupedActiveDate(), this.year(), this.viewSize(), this.metric());
     });
 
     effect(() => {
@@ -130,19 +139,30 @@ export class AqiHeatmap {
     });
   }
 
-  private async loadData(activeDate: Date, year: number, viewSize: ViewSize): Promise<void> {
+  private async loadData(
+    activeDate: Date,
+    year: number,
+    viewSize: ViewSize,
+    metric: Metric,
+  ): Promise<void> {
     const rawData = await this.duckDb.queryParquet(`
-      SELECT CAST(timestamp AS DATE) AS date, MAX(pm25) AS maxPm25
+      SELECT CAST(timestamp AS DATE) AS date, AVG(pm25) AS avgPm25, MAX(pm25) AS maxPm25
       FROM DATA_FILE
       WHERE CAST(timestamp AS DATE) >= '${year}-01-01' AND CAST(timestamp AS DATE) <= '${year}-12-31'
       AND pm25 IS NOT NULL
       GROUP BY CAST(timestamp AS DATE)
+      ${metric === 'avg' ? 'HAVING COUNT(pm25) >= 18' : ''}
     `);
 
-    this.prepareHeatmapData(rawData, activeDate, viewSize);
+    this.prepareHeatmapData(rawData, activeDate, viewSize, metric);
   }
 
-  private prepareHeatmapData(data: Pm25Point[], activeDate: Date, viewSize: ViewSize) {
+  private prepareHeatmapData(
+    data: Pm25Point[],
+    activeDate: Date,
+    viewSize: ViewSize,
+    metric: Metric,
+  ) {
     const matrix: {
       [day: string]: {
         [week: string]: { value: number; date: Date; isStreetFoodMarketSunday: boolean };
@@ -182,8 +202,8 @@ export class AqiHeatmap {
 
     const dateRangeKey =
       monthStart && endMonth
-        ? `${monthStart.getTime()}-${endMonth.getTime()}`
-        : `full-year-${activeDate.getFullYear()}`;
+        ? `${monthStart.getTime()}-${endMonth.getTime()}-${metric}`
+        : `full-year-${activeDate.getFullYear()}-${metric}`;
 
     if (viewSize === this.lastViewSize && dateRangeKey === this.lastDateRangeKey) {
       return;
@@ -205,7 +225,7 @@ export class AqiHeatmap {
       const isStreetFoodMarketSunday = dateObj ? this.isStreetFoodMarketSunday(dateObj) : false;
 
       matrix[dayName][weekIdentifier] = {
-        value: Math.round(point.maxPm25),
+        value: Math.round(metric === 'avg' ? point.avgPm25 : point.maxPm25),
         date: dateObj,
         isStreetFoodMarketSunday,
       };
@@ -266,8 +286,8 @@ export class AqiHeatmap {
           ranges: [
             { from: 0, to: 12, name: 'Good (0-12)', color: '#2ecc71' },
             { from: 12.1, to: 35.4, name: 'Moderate', color: '#f1c40f' },
-            { from: 35.5, to: 55.4, name: 'Unhealthy Context', color: '#e67e22' },
-            { from: 55.5, to: 9999, name: 'Severe Spike', color: '#e74c3c' },
+            { from: 35.5, to: 55.4, name: 'Unhealthy', color: '#e67e22' },
+            { from: 55.5, to: 9999, name: 'Hazardous', color: '#e74c3c' },
           ],
         },
       },
@@ -290,10 +310,6 @@ export class AqiHeatmap {
         fontSize: '14px',
         colors: ['#fff'], // Keeps the emoji readable over the cell colors
       },
-    });
-
-    this.title.set({
-      text: `${year} Peak Daily PM2.5 Levels`,
     });
   }
 
