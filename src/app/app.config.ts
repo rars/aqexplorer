@@ -12,6 +12,7 @@ import { enGB } from 'date-fns/locale';
 import { routes } from './app.routes';
 import { DuckDbService } from './services/duckdb/duck-db';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
+import { APP_BASE_HREF } from '@angular/common';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -22,7 +23,8 @@ export const appConfig: ApplicationConfig = {
     provideDateFnsAdapter(),
     provideAppInitializer(() => {
       const duckDbService = inject(DuckDbService);
-      const fileUrl = window.location.origin + '/pm2.5.parquet';
+      const baseHref = inject(APP_BASE_HREF, { optional: true }) || '/';
+      const fileUrl = window.location.origin + baseHref + 'pm2.5.parquet';
       return duckDbService.initDatabase(fileUrl);
     }),
   ],

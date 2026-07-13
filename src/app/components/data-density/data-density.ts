@@ -143,7 +143,6 @@ export class DataDensity {
           console.log(clickedDataPoint);
           if (clickedDataPoint && clickedDataPoint.meta?.date) {
             this.dateChange.emit(clickedDataPoint.meta.date);
-            console.log('Selected Date:', clickedDataPoint.meta.date);
           }
         },
       },
