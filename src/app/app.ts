@@ -6,6 +6,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { getYear } from 'date-fns';
 import { AqiHeatmap } from './components/aqi-heatmap/aqi-heatmap';
+import { SeriesComparison } from './components/series-comparison/series-comparison';
 
 @Component({
   selector: 'app-root',
@@ -16,6 +17,7 @@ import { AqiHeatmap } from './components/aqi-heatmap/aqi-heatmap';
     MatInputModule,
     MatDatepickerModule,
     AqiHeatmap,
+    SeriesComparison,
   ],
   templateUrl: './app.html',
   styleUrl: './app.css',

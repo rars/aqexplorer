@@ -1,0 +1,24 @@
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  @if (error()) {
+    <div style="color: red">Error: {{ error() }}</div>
+  }
+
+  <div style="background: white; padding: 20px; border-radius: 8px">
+    <apx-chart
+      [series]="series()"
+      [chart]="chart"
+      [xaxis]="xaxis"
+      [yaxis]="yaxis()"
+      [title]="title"
+      [stroke]="stroke"
+      [colors]="colors"
+      [fill]="fill"
+    >
+    </apx-chart>
+    <p class="text-sm text-slate-500 font-normal mt-1 mb-4 max-w-2xl">
+      This chart shows PM2.5 readings averaged over Sundays that fall on the St. Food Market vs
+      other Sundays (excluding January where the markets are not held). Shaded regions represent +/-
+      1.96 standard error intervals representing 95% confidence intervals.
+    </p>
+  </div>
+</div>
